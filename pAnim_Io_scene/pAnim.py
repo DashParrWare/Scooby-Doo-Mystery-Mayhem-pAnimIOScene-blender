@@ -16,12 +16,11 @@ rotations=[]
 
 #EXPORT SOON
 
-def ReadpAnim(f, filepath):
+def ReadpAnim(f, filepath, file_index=""):
     
     ob = bpy.context.object
     FileSize = unpack(">I", f.read(4))[0]
-    fourthousandnintysix = unpack(">H", f.read(2))[0]
-    compression = unpack(">H", f.read(2))[0]
+    compression = unpack(">I", f.read(4))[0]>>16
     framerate = unpack(">f", f.read(4))[0]
     boneCount = unpack("B", f.read(1))[0]
     type1 = unpack("B", f.read(1))[0]
@@ -32,10 +31,11 @@ def ReadpAnim(f, filepath):
     bpy.context.scene.render.fps_base = 1
     bpy.context.scene.unit_settings.system_rotation = 'RADIANS'
 
-    rotx_index = 0
+    index = 2
 
-    #Velma bone 39
-    clean_rotations_x = -0.098094
+    magic_index_num_1 = 10
+
+    bone_i_22 = 20
 
     
 
@@ -43,16 +43,16 @@ def ReadpAnim(f, filepath):
         pbone.rotation_mode = "XYZ"
 
     for i in range(boneCount):
-        fourthousandnintysix_off = unpack(">H", f.read(2))[0]
+        compression_off = unpack(">H", f.read(2))[0]
         bone_id = unpack(">H", f.read(2))[0]
         maximum_keyframe_id = unpack(">H", f.read(2))[0]
         size_off = unpack(">H", f.read(2))[0]
         for i in range(maximum_keyframe_id):
-            fourthousandnintysix_on = unpack(">H", f.read(2))[0]
+            compression_on = unpack(">H", f.read(2))[0]
             key_index = unpack(">H", f.read(2))[0]
             unk = unpack(">H", f.read(2))[0]
             size_on = unpack(">H", f.read(2))[0]
-            entrysize.append([key_index, size_on, bone_id])
+            entrysize.append([key_index, size_on, bone_id, compression_on])
         
     for i, entry_size in enumerate(entrysize):
         if entry_size[1]:
@@ -62,7 +62,6 @@ def ReadpAnim(f, filepath):
             type1_ = f.read(3)
             #16 bytes
             if type1_ == b"\x01\x00\x01":
-                rotx_index += 1
                 if entry_size[0] == 0:
                     XScale = unpack(">f", f.read(4))[0]
                     if entry_size[2]:
@@ -77,16 +76,31 @@ def ReadpAnim(f, filepath):
                         ob.pose.bones[entry_size[2]].scale[2] = ZScale
                 elif entry_size[0] == 3:
                     XPos = unpack(">f", f.read(4))[0]
-                    if entry_size[2]:
-                        ob.pose.bones[entry_size[2]].location[0] = XPos / compression
+                    if entry_size[2] == index:
+                        ob.pose.bones[entry_size[2]].location[1] = XPos / entry_size[3] * compression / 16
+                        index+=1
+                    elif entry_size[2] == 0:
+                        ob.pose.bones[entry_size[2]].location[0] = XPos
+                    elif entry_size[2] == 1:
+                        ob.pose.bones[entry_size[2]].location[0] = XPos
                 elif entry_size[0] == 4:
                     YPos = unpack(">f", f.read(4))[0]
-                    if entry_size[2]:
-                        ob.pose.bones[entry_size[2]].location[1] = YPos / compression
+                    if entry_size[2] == index:
+                        ob.pose.bones[entry_size[2]].location[1] = YPos / entry_size[3] * compression / 16
+                        index+=1
+                    elif entry_size[2] == 0:
+                        ob.pose.bones[entry_size[2]].location[1] = YPos
+                    elif entry_size[2] == 1:
+                        ob.pose.bones[entry_size[2]].location[1] = YPos
                 elif entry_size[0] == 5:
                     ZPos = unpack(">f", f.read(4))[0]
                     if entry_size[2]:
-                        ob.pose.bones[entry_size[2]].location[2] = ZPos / compression
+                        ob.pose.bones[entry_size[2]].location[2] = ZPos / entry_size[3] * compression / 16
+                        index+=1
+                    elif entry_size[2] == 0:
+                        ob.pose.bones[entry_size[2]].location[2] = ZPos
+                    elif entry_size[2] == 1:
+                        ob.pose.bones[entry_size[2]].location[2] = ZPos
                 elif entry_size[0] == 6:
                     XRot = unpack(">f", f.read(4))[0]
                     if entry_size[2]:
@@ -177,11 +191,11 @@ def WritepAnimGameCube(f):
 
 def WritepAnimPS2(f):
     ob = bpy.context.object
-    f.write(pack(">I", 16))
+    f.write(pack("<I", 16))
     
 
 def pAnim_importing(filepath):
     with open(filepath, "rb") as f:
-        ReadpAnim(f, filepath)
+        ReadpAnim(f, filepath, file_index="")
         
     
